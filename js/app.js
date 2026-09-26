@@ -652,43 +652,65 @@ function descargarTxt() {
 
 // ─── Descargar .docx ────────────────────────────────────────
 
+function xmlEscape(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 async function descargarDocx() {
   if (!textoResultado.value) return;
   btnDescargarDocx.disabled = true;
   btnDescargarDocx.innerHTML = '<span class="spinner"></span> Generando…';
 
   try {
-    if (typeof docx === 'undefined') throw new Error('La biblioteca docx no se cargó. Verifica tu conexión.');
-    const { Document, Packer, Paragraph, TextRun } = docx;
+    const paginasOrdenadas = paginas
+      .filter(p => p.estado === 'lista')
+      .sort((a, b) => a.indice - b.indice);
 
-    const children = [];
-
-    const paginasListas_ = paginas.filter(p => p.estado === 'lista').sort((a,b) => a.indice - b.indice);
-
-    paginasListas_.forEach((pag, i) => {
-      const conSalto = i > 0;
-
+    let cuerpo = '';
+    paginasOrdenadas.forEach((pag, i) => {
+      if (i > 0) {
+        cuerpo += '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+      }
       if (separadores) {
-        children.push(new Paragraph({
-          pageBreakBefore: conSalto,
-          children: [new TextRun({ text: `— Página ${pag.indice} —`, bold: true })]
-        }));
-      } else if (conSalto) {
-        children.push(new Paragraph({ pageBreakBefore: true, children: [new TextRun('')] }));
+        cuerpo += `<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>— Página ${pag.indice} —</w:t></w:r></w:p>`;
       }
-
-      const lineas = pag.texto.split('\n');
-      for (const linea of lineas) {
-        children.push(new Paragraph({ children: [new TextRun(linea)] }));
+      for (const linea of pag.texto.split('\n')) {
+        cuerpo += `<w:p><w:r><w:t xml:space="preserve">${xmlEscape(linea)}</w:t></w:r></w:p>`;
       }
     });
+    cuerpo += '<w:p/>';
 
-    const doc = new Document({
-      sections: [{ children }]
+    const zip = new JSZip();
+    zip.file('[Content_Types].xml',
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+      '</Types>');
+    zip.file('_rels/.rels',
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+      '</Relationships>');
+    zip.file('word/_rels/document.xml.rels',
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>');
+    zip.file('word/document.xml',
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
+      '<w:body>' + cuerpo + '</w:body></w:document>');
+
+    const blob = await zip.generateAsync({
+      type: 'blob',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      compression: 'DEFLATE'
     });
-
-    const buffer = await Packer.toBlob(doc);
-    descargarBlob(buffer, `${nombreArchivo}.docx`);
+    descargarBlob(blob, `${nombreArchivo}.docx`);
   } catch (err) {
     mostrarError(`❌ Error generando el archivo .docx: ${err.message || err}`);
     console.error(err);
