@@ -573,14 +573,36 @@ async function finalizarProceso() {
     if (btnViejo) btnViejo.remove();
   }
 
-  // Liberar workers
+  // Liberar workers OCR
   for (const w of workerPool) {
     try { await w.terminate(); } catch { /* ignorar */ }
   }
   workerPool = [];
 
-  // Arrancar corrector ortográfico en segundo plano para que esté listo al descargar
+  // Arrancar corrección en segundo plano y bloquear botón .docx hasta que termine
+  prepararDocx();
+}
+
+async function prepararDocx() {
+  btnDescargarDocx.disabled = true;
+  btnDescargarDocx.textContent = '⏳ Corrigiendo texto…';
+
   iniciarWorkerCorrector();
+
+  // Esperar a que el worker esté listo
+  await new Promise(resolve => {
+    if (_correctorListo || !_workerCorrector) { resolve(); return; }
+    _correctorReadyCallbacks.push(resolve);
+  });
+
+  // Corregir todas las páginas (en el worker, sin bloquear UI)
+  const listas = paginas.filter(p => p.estado === 'lista');
+  for (const pag of listas) {
+    pag.textoCorregido = await corregirConWorker(limpiarLineasOCR(pag.texto));
+  }
+
+  btnDescargarDocx.disabled = false;
+  btnDescargarDocx.textContent = '⬇ Descargar .docx';
 }
 
 // ─── Reintentar todas las páginas con error ──────────────────
@@ -655,10 +677,11 @@ function descargarTxt() {
 
 // ─── Corrector ortográfico en Web Worker ─────────────────────
 
-let _workerCorrector  = null;
-let _correctorListo   = false;
-let _correctorPending = {}; // id → resolve
-let _correctorIdSeq   = 0;
+let _workerCorrector        = null;
+let _correctorListo         = false;
+let _correctorPending       = {}; // id → resolve
+let _correctorIdSeq         = 0;
+let _correctorReadyCallbacks = [];
 
 function iniciarWorkerCorrector() {
   if (_workerCorrector) return;
@@ -668,18 +691,29 @@ function iniciarWorkerCorrector() {
       const { tipo, id, texto, msg } = e.data;
       if (tipo === 'listo') {
         _correctorListo = true;
+        _correctorReadyCallbacks.forEach(fn => fn());
+        _correctorReadyCallbacks = [];
         console.log('[Corrector] diccionario listo');
       } else if (tipo === 'error') {
         console.warn('[Corrector]', msg);
+        // Resolver callbacks aunque haya error para no quedar colgado
+        _correctorReadyCallbacks.forEach(fn => fn());
+        _correctorReadyCallbacks = [];
       } else if (tipo === 'resultado' && _correctorPending[id]) {
         _correctorPending[id](texto);
         delete _correctorPending[id];
       }
     };
-    _workerCorrector.onerror = e => console.warn('[Corrector] worker error:', e.message);
+    _workerCorrector.onerror = e => {
+      console.warn('[Corrector] worker error:', e.message);
+      _correctorReadyCallbacks.forEach(fn => fn());
+      _correctorReadyCallbacks = [];
+    };
     _workerCorrector.postMessage({ tipo: 'cargar' });
   } catch(e) {
     console.warn('[Corrector] no disponible:', e.message);
+    _correctorReadyCallbacks.forEach(fn => fn());
+    _correctorReadyCallbacks = [];
   }
 }
 
@@ -747,36 +781,35 @@ async function descargarDocx() {
       .filter(p => p.estado === 'lista')
       .sort((a, b) => a.indice - b.indice);
 
-    btnDescargarDocx.innerHTML = '<span class="spinner"></span> Corrigiendo texto…';
-
-    // Limpiar todas las páginas y enviarlas al corrector en paralelo
-    const textosPorPagina = await Promise.all(
-      paginasOrdenadas.map(pag => corregirConWorker(limpiarLineasOCR(pag.texto)))
-    );
-
     btnDescargarDocx.innerHTML = '<span class="spinner"></span> Generando…';
 
     const font  = '<w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/>';
     const pProp = '<w:pPr><w:jc w:val="both"/><w:spacing w:after="120" w:line="276" w:lineRule="auto"/></w:pPr>';
 
-    let cuerpo = '';
-    paginasOrdenadas.forEach((pag, i) => {
-      if (i > 0) {
-        cuerpo += '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
-      }
+    const partes = [];
+    for (let i = 0; i < paginasOrdenadas.length; i++) {
+      const pag = paginasOrdenadas[i];
+      // Yield al navegador cada 5 páginas para no congelar
+      if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
+
+      let bloque = '';
+      if (i > 0) bloque += '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
       if (separadores) {
-        cuerpo += `<w:p>${pProp}<w:r><w:rPr>${font}<w:b/></w:rPr><w:t>— Página ${pag.indice} —</w:t></w:r></w:p>`;
+        bloque += `<w:p>${pProp}<w:r><w:rPr>${font}<w:b/></w:rPr><w:t>— Página ${pag.indice} —</w:t></w:r></w:p>`;
       }
-      const parrafos = textosPorPagina[i].split(/\n{2,}/);
+      // Usar texto ya corregido si está disponible
+      const parrafos = (pag.textoCorregido || limpiarLineasOCR(pag.texto)).split(/\n{2,}/);
       for (const parrafo of parrafos) {
         const texto = parrafo.replace(/\n/g, ' ').replace(/\s{2,}/g, ' ').trim();
         if (texto) {
-          cuerpo += `<w:p>${pProp}<w:r><w:rPr>${font}</w:rPr><w:t xml:space="preserve">${xmlEscape(texto)}</w:t></w:r></w:p>`;
+          bloque += `<w:p>${pProp}<w:r><w:rPr>${font}</w:rPr><w:t xml:space="preserve">${xmlEscape(texto)}</w:t></w:r></w:p>`;
         }
       }
-    });
+      partes.push(bloque);
+    }
     // Configuración de página: A4, márgenes de 2.5 cm
-    cuerpo += '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1418" w:right="1418" w:bottom="1418" w:left="1418"/></w:sectPr>';
+    const cuerpo = partes.join('') +
+      '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1418" w:right="1418" w:bottom="1418" w:left="1418"/></w:sectPr>';
 
     const zip = new JSZip();
     zip.file('[Content_Types].xml',
