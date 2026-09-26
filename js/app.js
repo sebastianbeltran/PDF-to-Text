@@ -578,6 +578,9 @@ async function finalizarProceso() {
     try { await w.terminate(); } catch { /* ignorar */ }
   }
   workerPool = [];
+
+  // Cargar diccionario en segundo plano para que esté listo al descargar
+  cargarCorrector();
 }
 
 // ─── Reintentar todas las páginas con error ──────────────────
@@ -650,14 +653,63 @@ function descargarTxt() {
   descargarBlob(blob, `${nombreArchivo}.txt`);
 }
 
+// ─── Corrector ortográfico (typo.js + diccionario español) ──
+
+let _corrector = null;
+let _cargandoCorrector = false;
+
+async function cargarCorrector() {
+  if (_corrector) return _corrector;
+  if (_cargandoCorrector || typeof Typo === 'undefined') return null;
+  _cargandoCorrector = true;
+  try {
+    const [aff, dic] = await Promise.all([
+      fetch('https://cdn.jsdelivr.net/npm/dictionary-es@3.2.3/index.aff').then(r => r.text()),
+      fetch('https://cdn.jsdelivr.net/npm/dictionary-es@3.2.3/index.dic').then(r => r.text())
+    ]);
+    _corrector = new Typo('es', aff, dic, { platform: 'any' });
+    console.log('[Corrector] diccionario español cargado');
+  } catch(e) {
+    console.warn('[Corrector] no se pudo cargar:', e.message);
+  }
+  _cargandoCorrector = false;
+  return _corrector;
+}
+
+function distanciaEdicion(a, b) {
+  if (Math.abs(a.length - b.length) > 2) return 99;
+  const m = a.length, n = b.length;
+  const dp = Array.from({length: m+1}, (_, i) =>
+    Array.from({length: n+1}, (_, j) => i || j));
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = a[i-1] === b[j-1]
+        ? dp[i-1][j-1]
+        : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+  return dp[m][n];
+}
+
+function corregirPalabras(texto, corrector) {
+  if (!corrector) return texto;
+  return texto.replace(/\b[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]{4,20}\b/g, palabra => {
+    if (corrector.check(palabra)) return palabra;
+    const sugs = corrector.suggest(palabra);
+    if (!sugs.length) return palabra;
+    const mejor = sugs[0];
+    const dist = distanciaEdicion(palabra.toLowerCase(), mejor.toLowerCase());
+    if (dist <= 2 && Math.abs(palabra.length - mejor.length) <= 1) return mejor;
+    return palabra;
+  });
+}
+
 // ─── Limpieza de líneas OCR para exportación ────────────────
 
 function limpiarLineasOCR(texto) {
   return texto.split('\n')
     .map(l => l
-      .replace(/\|/g, '')          // bordes de página
-      .replace(/[_=~]{3,}/g, '')   // líneas decorativas (===, ___, ~~~)
-      .replace(/\s{2,}/g, ' ')     // espacios dobles
+      .replace(/\|/g, '')
+      .replace(/[_=~]{3,}/g, '')
+      .replace(/\s{2,}/g, ' ')
       .trim()
     )
     .filter(linea => {
@@ -665,19 +717,22 @@ function limpiarLineasOCR(texto) {
 
       const letras = (linea.match(/[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]/g) || []).length;
       const chars  = linea.replace(/\s/g, '').length;
-
-      // Descartar si menos del 35% son letras (línea principalmente basura)
       if (chars > 4 && letras / chars < 0.35) return false;
-
-      // Debe tener al menos una palabra de 3+ letras seguidas
       if (!/[a-záéíóúüñ]{3}/i.test(linea)) return false;
+
+      // Líneas con 4+ palabras donde el promedio de letras por palabra < 3 → basura
+      const palabras = linea.split(/\s+/).filter(p => /[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]/.test(p));
+      if (palabras.length >= 4) {
+        const prom = palabras.reduce((s, p) =>
+          s + p.replace(/[^a-záéíóúüñA-ZÁÉÍÓÚÜÑ]/g, '').length, 0) / palabras.length;
+        if (prom < 3) return false;
+      }
 
       return true;
     })
-    .map(linea => {
-      // Quitar fragmentos sueltos de 1-2 chars al inicio (Kx, Sl, e >, af)
-      return linea.replace(/^[a-zA-Z]{1,2}\s+(?=[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ])/, '').trim();
-    })
+    .map(linea =>
+      linea.replace(/^[a-zA-Z]{1,2}\s+(?=[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ])/, '').trim()
+    )
     .filter(linea => linea.length >= 5)
     .join('\n');
 }
@@ -702,6 +757,10 @@ async function descargarDocx() {
       .filter(p => p.estado === 'lista')
       .sort((a, b) => a.indice - b.indice);
 
+    btnDescargarDocx.innerHTML = '<span class="spinner"></span> Cargando corrector…';
+    const corrector = await cargarCorrector();
+    btnDescargarDocx.innerHTML = '<span class="spinner"></span> Generando…';
+
     const font  = '<w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/>';
     const pProp = '<w:pPr><w:jc w:val="both"/><w:spacing w:after="120" w:line="276" w:lineRule="auto"/></w:pPr>';
 
@@ -713,9 +772,10 @@ async function descargarDocx() {
       if (separadores) {
         cuerpo += `<w:p>${pProp}<w:r><w:rPr>${font}<w:b/></w:rPr><w:t>— Página ${pag.indice} —</w:t></w:r></w:p>`;
       }
-      // Limpiar basura OCR y unir líneas en párrafos (separar en líneas vacías)
-      const textoLimpio = limpiarLineasOCR(pag.texto);
-      const parrafos = textoLimpio.split(/\n{2,}/);
+      // Limpiar basura OCR, corregir ortografía y unir líneas en párrafos
+      const textoLimpio   = limpiarLineasOCR(pag.texto);
+      const textoCorregido = corregirPalabras(textoLimpio, corrector);
+      const parrafos = textoCorregido.split(/\n{2,}/);
       for (const parrafo of parrafos) {
         const texto = parrafo.replace(/\n/g, ' ').replace(/\s{2,}/g, ' ').trim();
         if (texto) {
