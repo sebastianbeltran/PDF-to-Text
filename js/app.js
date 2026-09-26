@@ -237,7 +237,6 @@ async function iniciarWorkers() {
   // Crear N workers en paralelo
   const promesas = Array.from({ length: NUM_WORKERS }, async () => {
     const w = await Tesseract.createWorker(idiomaOCR, 1, {
-      workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@4.1.4/dist/worker.min.js',
       logger: m => {
         if (m.status && m.status !== 'recognizing text') {
           console.log('[OCR]', m.status, m.progress != null ? Math.round(m.progress * 100) + '%' : '');
