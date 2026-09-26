@@ -725,9 +725,18 @@ async function cargarDiccionario() {
     'construido','construida','construidos','construidas',
     'suscrito','suscrita','suscritos','suscritas',
     'adquirido','adquirida','adquiridos','adquiridas',
-    // Adjetivos/adverbios frecuentes
-    'debidamente','debidamente','inscrito','inscritos',
+    // Gerundios y participios frecuentes en documentos legales
+    'limitando','limitada','limitados','limitadas',
+    'sometiendo','sometida','sometidos','sometidas',
+    'protocoliza','protocolizó','protocolizaron','protocolizando',
+    'adquirió','adquirieron','adquiriendo',
+    'construirá','construirán','construyendo',
+    'debidamente','inscrito','inscritos','inscrita','inscritas',
     'ordenador','ordenadores',
+    // Plurales que el bug de -ión generaba mal
+    'instalaciones','modificaciones','construcciones','prolongaciones',
+    'autorizaciones','intersecciones','disposiciones','condiciones',
+    'obligaciones','menciones','situaciones','secciones',
   ];
   for (const w of suplemento) _diccionario.add(w);
 
@@ -736,13 +745,21 @@ async function cargarDiccionario() {
     if (w.length < 2) continue;
     _diccionario.add(w);
 
-    // Plural simple: terreno→terrenos, ciudad→ciudades, luz→luces
-    if (w.endsWith('z')) {
-      _diccionario.add(w.slice(0, -1) + 'ces');
+    // Plural con reglas correctas de acentuación española
+    if (w.endsWith('ión')) {
+      _diccionario.add(w.slice(0, -3) + 'iones'); // instalación→instalaciones
+    } else if (w.endsWith('ón')) {
+      _diccionario.add(w.slice(0, -2) + 'ones');  // corazón→corazones
+    } else if (w.endsWith('ín')) {
+      _diccionario.add(w.slice(0, -2) + 'ines');
+    } else if (w.endsWith('én')) {
+      _diccionario.add(w.slice(0, -2) + 'enes');
+    } else if (w.endsWith('z')) {
+      _diccionario.add(w.slice(0, -1) + 'ces');   // luz→luces
     } else if (/[aeiouáéíóú]$/.test(w)) {
-      _diccionario.add(w + 's');
+      _diccionario.add(w + 's');                   // terreno→terrenos
     } else if (w.length > 3) {
-      _diccionario.add(w + 'es');
+      _diccionario.add(w + 'es');                  // ciudad→ciudades
     }
 
     // Conjugaciones pasadas de verbos regulares
