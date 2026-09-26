@@ -392,6 +392,54 @@ async function renderizarPaginaACanvas(numPagina) {
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   await page.render({ canvasContext: ctx, viewport: vp }).promise;
 
+  // Preprocesamiento para mejorar OCR en documentos escaneados:
+  // 1. Escala de grises  2. Estiramiento de contraste  3. Umbral adaptativo
+  const img   = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d     = img.data;
+  const n     = d.length;
+
+  // Paso 1: convertir a grises y recoger valores para estiramiento de contraste
+  const grises = new Uint8Array(n / 4);
+  for (let i = 0; i < n; i += 4) {
+    grises[i >> 2] = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) | 0;
+  }
+
+  // Paso 2: estiramiento de contraste (percentil 5 → 0, percentil 95 → 255)
+  const sorted = grises.slice().sort();
+  const lo = sorted[Math.floor(n / 4 * 0.05)] || 0;
+  const hi = sorted[Math.floor(n / 4 * 0.95)] || 255;
+  const rango = hi - lo || 1;
+
+  // Paso 3: aplicar contraste estirado + umbral adaptativo (Sauvola simplificado)
+  const ancho = canvas.width;
+  const radio = Math.max(15, (ancho / 60) | 0); // ventana local ~1.5% del ancho
+  for (let i = 0; i < n; i += 4) {
+    const idx = i >> 2;
+    // Estirar contraste
+    let g = ((grises[idx] - lo) / rango * 255 + 0.5) | 0;
+    g = g < 0 ? 0 : g > 255 ? 255 : g;
+
+    // Umbral local: media de un muestreo de vecinos (3×3 submuestreo)
+    const x = idx % ancho;
+    const y = (idx / ancho) | 0;
+    let suma = 0, cnt = 0;
+    for (let dy = -radio; dy <= radio; dy += radio) {
+      for (let dx = -radio; dx <= radio; dx += radio) {
+        const nx = x + dx, ny = y + dy;
+        if (nx >= 0 && nx < ancho && ny >= 0 && ny < canvas.height) {
+          suma += grises[ny * ancho + nx];
+          cnt++;
+        }
+      }
+    }
+    const umbral = (suma / cnt) * 0.85; // k=0.85 → más agresivo con fondo claro
+    const val = g < umbral ? 0 : 255;
+
+    d[i] = d[i + 1] = d[i + 2] = val;
+    // d[i+3] (alpha) sin cambio
+  }
+
+  ctx.putImageData(img, 0, 0);
   return canvas;
 }
 
