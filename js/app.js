@@ -650,6 +650,38 @@ function descargarTxt() {
   descargarBlob(blob, `${nombreArchivo}.txt`);
 }
 
+// ─── Limpieza de líneas OCR para exportación ────────────────
+
+function limpiarLineasOCR(texto) {
+  return texto.split('\n')
+    .map(l => l
+      .replace(/\|/g, '')          // bordes de página
+      .replace(/[_=~]{3,}/g, '')   // líneas decorativas (===, ___, ~~~)
+      .replace(/\s{2,}/g, ' ')     // espacios dobles
+      .trim()
+    )
+    .filter(linea => {
+      if (linea.length < 5) return false;
+
+      const letras = (linea.match(/[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]/g) || []).length;
+      const chars  = linea.replace(/\s/g, '').length;
+
+      // Descartar si menos del 35% son letras (línea principalmente basura)
+      if (chars > 4 && letras / chars < 0.35) return false;
+
+      // Debe tener al menos una palabra de 3+ letras seguidas
+      if (!/[a-záéíóúüñ]{3}/i.test(linea)) return false;
+
+      return true;
+    })
+    .map(linea => {
+      // Quitar fragmentos sueltos de 1-2 chars al inicio (Kx, Sl, e >, af)
+      return linea.replace(/^[a-zA-Z]{1,2}\s+(?=[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ])/, '').trim();
+    })
+    .filter(linea => linea.length >= 5)
+    .join('\n');
+}
+
 // ─── Descargar .docx ────────────────────────────────────────
 
 function xmlEscape(str) {
@@ -681,8 +713,9 @@ async function descargarDocx() {
       if (separadores) {
         cuerpo += `<w:p>${pProp}<w:r><w:rPr>${font}<w:b/></w:rPr><w:t>— Página ${pag.indice} —</w:t></w:r></w:p>`;
       }
-      // Unir líneas sueltas en párrafos; separar solo en líneas vacías
-      const parrafos = pag.texto.split(/\n{2,}/);
+      // Limpiar basura OCR y unir líneas en párrafos (separar en líneas vacías)
+      const textoLimpio = limpiarLineasOCR(pag.texto);
+      const parrafos = textoLimpio.split(/\n{2,}/);
       for (const parrafo of parrafos) {
         const texto = parrafo.replace(/\n/g, ' ').replace(/\s{2,}/g, ' ').trim();
         if (texto) {
