@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF a Texto</title>
+  <meta name="description" content="Convierte PDFs a texto plano en tu navegador. Sin servidor, sin subir archivos." />
+  <link rel="stylesheet" href="css/estilos.css" />
+
+  <!-- PDF.js 3.11.174 — versión fija para reproducibilidad -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+
+  <!-- Tesseract.js 4.1.4 — OCR en el navegador -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.1.4/dist/tesseract.min.js"></script>
+
+  <!-- docx 8.5.0 — generación de archivos .docx -->
+  <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.js"></script>
+</head>
+<body>
+<div class="contenedor">
+
+  <!-- Encabezado -->
+  <header>
+    <h1>📄 PDF a Texto</h1>
+    <p>Convierte PDFs a texto plano directamente en tu navegador</p>
+    <div class="privacidad">
+      🔒 Todo se procesa en tu computador — ningún archivo se sube a internet
+    </div>
+  </header>
+
+  <!-- Zona de carga -->
+  <div class="tarjeta">
+    <div id="zona-arrastrar" role="button" tabindex="0" aria-label="Arrastrar PDF o hacer clic para seleccionar">
+      <span class="icono" aria-hidden="true">📂</span>
+      <p>Arrastra tu PDF aquí o haz clic para seleccionarlo</p>
+      <button class="btn btn-primario" id="btn-seleccionar" type="button">
+        Seleccionar archivo PDF
+      </button>
+    </div>
+    <input type="file" id="input-archivo" accept=".pdf,application/pdf" aria-label="Seleccionar archivo PDF" />
+
+    <!-- Zona de error -->
+    <div id="zona-error" role="alert" aria-live="assertive"></div>
+
+    <!-- Opciones -->
+    <div class="fila-opciones" style="margin-top:1.2rem; gap:1.2rem;">
+      <div>
+        <label for="selector-idioma">Idioma OCR:</label><br/>
+        <select id="selector-idioma" aria-label="Idioma para reconocimiento de texto">
+          <option value="spa+eng" selected>Español + Inglés</option>
+          <option value="spa">Solo Español</option>
+          <option value="eng">Solo Inglés</option>
+        </select>
+      </div>
+
+      <label class="checkbox-label">
+        <input type="checkbox" id="chk-forzar-ocr" />
+        Leer todas las páginas con OCR
+      </label>
+
+      <label class="checkbox-label">
+        <input type="checkbox" id="chk-separadores" checked />
+        Insertar separadores entre páginas
+      </label>
+    </div>
+
+    <!-- Aviso primera descarga de idioma -->
+    <div id="aviso-descarga" aria-live="polite">
+      ℹ️ La primera vez se descargan los datos de idioma (~15 MB). Puede tardar un momento según tu conexión.
+    </div>
+  </div>
+
+  <!-- Sección de progreso -->
+  <div class="tarjeta" id="seccion-progreso" aria-live="polite">
+    <div class="info-progreso">
+      <span id="txt-progreso">Preparando…</span>
+      <span id="txt-tiempo"></span>
+    </div>
+    <div class="barra-fondo" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" id="barra-aria">
+      <div class="barra-relleno" id="barra-relleno"></div>
+    </div>
+    <div class="fila-estado">
+      <span id="txt-pagina-actual"></span>
+      <span id="txt-workers"></span>
+      <div style="margin-left:auto; display:flex; gap:0.5rem;">
+        <button class="btn btn-peligro btn-sm" id="btn-detener" type="button">⏹ Detener</button>
+        <button class="btn btn-primario btn-sm" id="btn-continuar" type="button" style="display:none">▶ Continuar</button>
+      </div>
+    </div>
+
+    <!-- Preview de la página en proceso -->
+    <div id="contenedor-preview">
+      <p>Procesando vista previa…</p>
+      <canvas id="canvas-preview" aria-label="Vista previa de la página en proceso"></canvas>
+    </div>
+  </div>
+
+  <!-- Lista de páginas -->
+  <div class="tarjeta" id="seccion-paginas">
+    <p class="titulo-seccion">Estado por página</p>
+    <div id="lista-paginas" role="list" aria-label="Estado de cada página del PDF"></div>
+  </div>
+
+  <!-- Resultado -->
+  <div class="tarjeta" id="seccion-resultado">
+    <div class="fila-acciones">
+      <button class="btn btn-secundario" id="btn-copiar" type="button">📋 Copiar</button>
+      <button class="btn btn-secundario" id="btn-descargar-txt" type="button">⬇ Descargar .txt</button>
+      <button class="btn btn-secundario" id="btn-descargar-docx" type="button">⬇ Descargar .docx</button>
+      <button class="btn btn-secundario btn-sm" id="btn-nuevo" type="button">🔄 Nuevo PDF</button>
+      <span class="contador" id="txt-contador" aria-live="polite"></span>
+    </div>
+    <textarea
+      id="texto-resultado"
+      spellcheck="false"
+      aria-label="Texto extraído del PDF, editable"
+      placeholder="El texto aparecerá aquí a medida que se procesen las páginas…"
+    ></textarea>
+  </div>
+
+</div><!-- /contenedor -->
+
+<script src="js/app.js"></script>
+</body>
+</html>
