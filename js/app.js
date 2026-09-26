@@ -237,8 +237,12 @@ async function iniciarWorkers() {
   // Crear N workers en paralelo
   const promesas = Array.from({ length: NUM_WORKERS }, async () => {
     const w = await Tesseract.createWorker(idiomaOCR, 1, {
-      // logger desactivado para no saturar la consola
-      logger: () => {}
+      workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@4.1.4/dist/worker.min.js',
+      logger: m => {
+        if (m.status && m.status !== 'recognizing text') {
+          console.log('[OCR]', m.status, m.progress != null ? Math.round(m.progress * 100) + '%' : '');
+        }
+      }
     });
     return w;
   });
@@ -540,20 +544,65 @@ async function reintentarPagina(numPagina) {
 // ─── Finalización ────────────────────────────────────────────
 
 async function finalizarProceso() {
-  txtProgreso.textContent = `✅ Proceso completado — ${totalPaginas} páginas`;
   txtTiempo.textContent   = '';
   txtPaginaActual.textContent = '';
   btnDetener.style.display   = 'none';
   btnContinuar.style.display = 'none';
   contenedorPreview.style.display = 'none';
-  actualizarBarra(1);
   actualizarContador();
+
+  const conError = paginas.filter(p => p.estado === 'error');
+
+  if (conError.length > 0) {
+    txtProgreso.textContent = `⚠️ ${paginasListas} páginas OK — ${conError.length} con error`;
+    actualizarBarra(paginasListas / totalPaginas);
+
+    // Botón de reintento masivo
+    const btnViejo = document.getElementById('btn-reintentar-todos');
+    if (btnViejo) btnViejo.remove();
+    const btnRetry = document.createElement('button');
+    btnRetry.id = 'btn-reintentar-todos';
+    btnRetry.className = 'btn btn-primario btn-sm';
+    btnRetry.type = 'button';
+    btnRetry.textContent = `↩ Reintentar ${conError.length} páginas con error`;
+    btnRetry.addEventListener('click', reintentarTodosErrores);
+    document.querySelector('.fila-estado').prepend(btnRetry);
+  } else {
+    txtProgreso.textContent = `✅ Proceso completado — ${totalPaginas} páginas`;
+    actualizarBarra(1);
+    const btnViejo = document.getElementById('btn-reintentar-todos');
+    if (btnViejo) btnViejo.remove();
+  }
 
   // Liberar workers
   for (const w of workerPool) {
     try { await w.terminate(); } catch { /* ignorar */ }
   }
   workerPool = [];
+}
+
+// ─── Reintentar todas las páginas con error ──────────────────
+
+async function reintentarTodosErrores() {
+  const conError = paginas.filter(p => p.estado === 'error');
+  if (conError.length === 0) return;
+
+  const btnRetry = document.getElementById('btn-reintentar-todos');
+  if (btnRetry) btnRetry.remove();
+
+  detenido = false;
+  colaPendiente = conError.map(p => { p.estado = 'pendiente'; return p.indice; });
+
+  seccionProgreso.style.display = 'block';
+  btnDetener.style.display = '';
+  txtProgreso.textContent = `Reintentando ${colaPendiente.length} páginas con error…`;
+  inicioProceso = Date.now();
+
+  await iniciarWorkers();
+  const tareas = workerPool.map(worker => procesarDesdeCola(worker));
+  await Promise.all(tareas);
+
+  if (!detenido) finalizarProceso();
 }
 
 // ─── Reiniciar todo ─────────────────────────────────────────
