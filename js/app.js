@@ -688,15 +688,46 @@ async function cargarDiccionario() {
   const lineas = texto.split('\n');
   _diccionario = new Set();
 
-  // Suplemento de palabras comunes ausentes en el diccionario base
+  // Suplemento: palabras comunes ausentes + formas verbales frecuentes en documentos legales
   const suplemento = [
+    // Propios y geográficos
     'colombia','colombiana','colombiano','colombianos','colombianas',
-    'bogotá','bogotano','cundinamarca','impedimento','impedimentos',
-    'compareciente','comparecientes','escritura','escrituras',
-    'notaría','notarías','lindero','linderos','linderos',
-    'cédula','cédulas','circuito','circuitos','autorizado','autorizados',
-    'ordenador','ordenadores','debidamente','otorgada','otorgadas',
-    'suscribir','suscrito','suscritos','suscrita','suscritas',
+    'bogotá','cundinamarca','antioquia',
+    // Sustantivos legales
+    'impedimento','impedimentos','compareciente','comparecientes',
+    'escritura','escrituras','notaría','notarías','lindero','linderos',
+    'cédula','cédulas','circuito','circuitos','circuitos',
+    'contrato','contratos','contrata','contratas',
+    'límite','límites','parámetro','parámetros','parágrafo','parágrafos',
+    'intersección','intersecciones','modificación','modificaciones',
+    'construcción','construcciones','prolongación','prolongaciones',
+    'autorización','autorizaciones',
+    // Verbos conjugados comunes (pasado)
+    'comparecieron','compareció','compareciendo',
+    'manifestaron','manifestó','manifestando',
+    'autorizaron','autorizó','autorizando',
+    'otorgaron','otorgó','otorgando',
+    'suscribieron','suscribió','suscribiendo',
+    'acordaron','acordó','acordando',
+    'determinaron','determinó','determinando',
+    'establecieron','estableció','estableciendo',
+    'concedieron','concedió','concediendo',
+    'identificaron','identificó','identificando',
+    // Formas presentes problemáticas
+    'concede','conceden','refiere','refieren',
+    'contiene','contienen','proviene','provienen',
+    'adquiere','adquieren','requiere','requieren',
+    // Participios problemáticos
+    'identificado','identificada','identificados','identificadas',
+    'autorizado','autorizada','autorizados','autorizadas',
+    'otorgado','otorgada','otorgados','otorgadas',
+    'establecido','establecida','establecidos','establecidas',
+    'construido','construida','construidos','construidas',
+    'suscrito','suscrita','suscritos','suscritas',
+    'adquirido','adquirida','adquiridos','adquiridas',
+    // Adjetivos/adverbios frecuentes
+    'debidamente','debidamente','inscrito','inscritos',
+    'ordenador','ordenadores',
   ];
   for (const w of suplemento) _diccionario.add(w);
 
@@ -715,37 +746,10 @@ async function cargarDiccionario() {
     }
 
     // Conjugaciones pasadas de verbos regulares
-    // Formas verbales y participios
-    if (w.endsWith('ar')) {
-      const r = w.slice(0, -2);
-      _diccionario.add(r + 'ó');      // manifestó
-      _diccionario.add(r + 'aron');   // manifestaron
-      _diccionario.add(r + 'aba');    // manifestaba
-      _diccionario.add(r + 'aban');   // manifestaban
-      _diccionario.add(r + 'ando');   // manifestando
-      _diccionario.add(r + 'ado');    // identificado
-      _diccionario.add(r + 'ada');    // identificada
-      _diccionario.add(r + 'ados');   // identificados
-      _diccionario.add(r + 'adas');   // identificadas
-      _diccionario.add(r + 'a');      // conceda
-      _diccionario.add(r + 'an');     // concedan
-    } else if (w.endsWith('er') || w.endsWith('ir')) {
-      const r = w.slice(0, -2);
-      _diccionario.add(r + 'ió');     // compareció
-      _diccionario.add(r + 'ieron');  // comparecieron
-      _diccionario.add(r + 'ía');     // comparecía
-      _diccionario.add(r + 'ían');    // comparecían
-      _diccionario.add(r + 'iendo');  // compareciendo
-      _diccionario.add(r + 'ido');    // contenido
-      _diccionario.add(r + 'ida');    // contenida
-      _diccionario.add(r + 'idos');   // contenidos
-      _diccionario.add(r + 'e');      // concede
-      _diccionario.add(r + 'en');     // conceden
-    }
     // Forma femenina de adjetivos terminados en -o
     if (w.endsWith('o') && w.length > 4) {
-      _diccionario.add(w.slice(0, -1) + 'a');   // universitario→universitaria
-      _diccionario.add(w.slice(0, -1) + 'as');  // universitarias
+      _diccionario.add(w.slice(0, -1) + 'a');
+      _diccionario.add(w.slice(0, -1) + 'as');
     }
 
     if (i % 8000 === 0) await new Promise(r => setTimeout(r, 0));
