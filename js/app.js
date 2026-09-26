@@ -670,19 +670,28 @@ async function descargarDocx() {
       .filter(p => p.estado === 'lista')
       .sort((a, b) => a.indice - b.indice);
 
+    const font  = '<w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/>';
+    const pProp = '<w:pPr><w:jc w:val="both"/><w:spacing w:after="120" w:line="276" w:lineRule="auto"/></w:pPr>';
+
     let cuerpo = '';
     paginasOrdenadas.forEach((pag, i) => {
       if (i > 0) {
         cuerpo += '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
       }
       if (separadores) {
-        cuerpo += `<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>— Página ${pag.indice} —</w:t></w:r></w:p>`;
+        cuerpo += `<w:p>${pProp}<w:r><w:rPr>${font}<w:b/></w:rPr><w:t>— Página ${pag.indice} —</w:t></w:r></w:p>`;
       }
-      for (const linea of pag.texto.split('\n')) {
-        cuerpo += `<w:p><w:r><w:t xml:space="preserve">${xmlEscape(linea)}</w:t></w:r></w:p>`;
+      // Unir líneas sueltas en párrafos; separar solo en líneas vacías
+      const parrafos = pag.texto.split(/\n{2,}/);
+      for (const parrafo of parrafos) {
+        const texto = parrafo.replace(/\n/g, ' ').replace(/\s{2,}/g, ' ').trim();
+        if (texto) {
+          cuerpo += `<w:p>${pProp}<w:r><w:rPr>${font}</w:rPr><w:t xml:space="preserve">${xmlEscape(texto)}</w:t></w:r></w:p>`;
+        }
       }
     });
-    cuerpo += '<w:p/>';
+    // Configuración de página: A4, márgenes de 2.5 cm
+    cuerpo += '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1418" w:right="1418" w:bottom="1418" w:left="1418"/></w:sectPr>';
 
     const zip = new JSZip();
     zip.file('[Content_Types].xml',
