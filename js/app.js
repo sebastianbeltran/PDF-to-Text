@@ -585,20 +585,20 @@ async function finalizarProceso() {
 
 async function prepararDocx() {
   btnDescargarDocx.disabled = true;
+  btnDescargarDocx.textContent = '⏳ Descargando diccionario…';
+
+  try {
+    await cargarDiccionario();
+  } catch(e) {
+    console.warn('[Corrector] diccionario no disponible:', e.message);
+    _diccionario = new Set(); // continuar sin corrección
+  }
+
   btnDescargarDocx.textContent = '⏳ Corrigiendo texto…';
 
-  iniciarWorkerCorrector();
-
-  // Esperar a que el worker esté listo
-  await new Promise(resolve => {
-    if (_correctorListo || !_workerCorrector) { resolve(); return; }
-    _correctorReadyCallbacks.push(resolve);
-  });
-
-  // Corregir todas las páginas (en el worker, sin bloquear UI)
   const listas = paginas.filter(p => p.estado === 'lista');
   for (const pag of listas) {
-    pag.textoCorregido = await corregirConWorker(limpiarLineasOCR(pag.texto));
+    pag.textoCorregido = await corregirTextoAsync(limpiarLineasOCR(pag.texto));
   }
 
   btnDescargarDocx.disabled = false;
@@ -675,55 +675,76 @@ function descargarTxt() {
   descargarBlob(blob, `${nombreArchivo}.txt`);
 }
 
-// ─── Corrector ortográfico en Web Worker ─────────────────────
+// ─── Corrector ortográfico (async con yields, hilo principal) ─
 
-let _workerCorrector        = null;
-let _correctorListo         = false;
-let _correctorPending       = {}; // id → resolve
-let _correctorIdSeq         = 0;
-let _correctorReadyCallbacks = [];
+const LETRAS_ES = 'aábcdeéfghiíjklmnñoópqrstuúüvwxyz';
+let _diccionario = null; // Set con palabras base válidas
+let _corrCache   = new Map();
 
-function iniciarWorkerCorrector() {
-  if (_workerCorrector) return;
-  try {
-    _workerCorrector = new Worker('js/worker-corrector.js');
-    _workerCorrector.onmessage = function(e) {
-      const { tipo, id, texto, msg } = e.data;
-      if (tipo === 'listo') {
-        _correctorListo = true;
-        _correctorReadyCallbacks.forEach(fn => fn());
-        _correctorReadyCallbacks = [];
-        console.log('[Corrector] diccionario listo');
-      } else if (tipo === 'error') {
-        console.warn('[Corrector]', msg);
-        // Resolver callbacks aunque haya error para no quedar colgado
-        _correctorReadyCallbacks.forEach(fn => fn());
-        _correctorReadyCallbacks = [];
-      } else if (tipo === 'resultado' && _correctorPending[id]) {
-        _correctorPending[id](texto);
-        delete _correctorPending[id];
-      }
-    };
-    _workerCorrector.onerror = e => {
-      console.warn('[Corrector] worker error:', e.message);
-      _correctorReadyCallbacks.forEach(fn => fn());
-      _correctorReadyCallbacks = [];
-    };
-    _workerCorrector.postMessage({ tipo: 'cargar' });
-  } catch(e) {
-    console.warn('[Corrector] no disponible:', e.message);
-    _correctorReadyCallbacks.forEach(fn => fn());
-    _correctorReadyCallbacks = [];
+async function cargarDiccionario() {
+  if (_diccionario) return;
+  const resp = await fetch('https://cdn.jsdelivr.net/npm/dictionary-es@3.2.3/index.dic');
+  const texto = await resp.text();
+  const lineas = texto.split('\n');
+  _diccionario = new Set();
+  // Parsear en lotes para ceder al navegador entre lotes
+  for (let i = 1; i < lineas.length; i++) {
+    const w = lineas[i].split('/')[0].toLowerCase().trim();
+    if (w.length >= 2) _diccionario.add(w);
+    if (i % 8000 === 0) await new Promise(r => setTimeout(r, 0));
   }
 }
 
-function corregirConWorker(texto) {
-  return new Promise(resolve => {
-    if (!_workerCorrector || !_correctorListo) { resolve(texto); return; }
-    const id = _correctorIdSeq++;
-    _correctorPending[id] = resolve;
-    _workerCorrector.postMessage({ tipo: 'corregir', id, texto });
-  });
+function _correccionD1(lower) {
+  for (let i = 0; i < lower.length; i++) {
+    for (const c of LETRAS_ES) {
+      if (c === lower[i]) continue;
+      const cand = lower.slice(0, i) + c + lower.slice(i + 1);
+      if (_diccionario.has(cand)) return cand;
+    }
+  }
+  for (let i = 0; i < lower.length; i++) {
+    const cand = lower.slice(0, i) + lower.slice(i + 1);
+    if (_diccionario.has(cand)) return cand;
+  }
+  for (let i = 0; i < lower.length - 1; i++) {
+    const cand = lower.slice(0, i) + lower[i+1] + lower[i] + lower.slice(i+2);
+    if (_diccionario.has(cand)) return cand;
+  }
+  for (let i = 0; i <= lower.length; i++) {
+    for (const c of LETRAS_ES) {
+      const cand = lower.slice(0, i) + c + lower.slice(i);
+      if (_diccionario.has(cand)) return cand;
+    }
+  }
+  return null;
+}
+
+function _corregirPalabra(palabra) {
+  const lower = palabra.toLowerCase();
+  if (_corrCache.has(lower)) {
+    const c = _corrCache.get(lower);
+    if (!c) return palabra;
+    return (palabra[0] >= 'A' && palabra[0] <= 'Z') ? c[0].toUpperCase() + c.slice(1) : c;
+  }
+  if (_diccionario.has(lower)) { _corrCache.set(lower, null); return palabra; }
+  const c = _correccionD1(lower);
+  _corrCache.set(lower, c);
+  if (!c) return palabra;
+  return (palabra[0] >= 'A' && palabra[0] <= 'Z') ? c[0].toUpperCase() + c.slice(1) : c;
+}
+
+async function corregirTextoAsync(texto) {
+  if (!_diccionario) return texto;
+  // Procesar en lotes de 200 palabras cediendo al navegador entre lotes
+  const tokens = texto.split(/(\b[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]{4,18}\b)/);
+  for (let i = 0; i < tokens.length; i++) {
+    if (i % 400 === 0 && i > 0) await new Promise(r => setTimeout(r, 0));
+    if (/^[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]{4,18}$/.test(tokens[i])) {
+      tokens[i] = _corregirPalabra(tokens[i]);
+    }
+  }
+  return tokens.join('');
 }
 
 // ─── Limpieza de líneas OCR para exportación ────────────────
