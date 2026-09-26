@@ -687,10 +687,38 @@ async function cargarDiccionario() {
   const texto = await resp.text();
   const lineas = texto.split('\n');
   _diccionario = new Set();
-  // Parsear en lotes para ceder al navegador entre lotes
+
   for (let i = 1; i < lineas.length; i++) {
     const w = lineas[i].split('/')[0].toLowerCase().trim();
-    if (w.length >= 2) _diccionario.add(w);
+    if (w.length < 2) continue;
+    _diccionario.add(w);
+
+    // Plural simple: terreno→terrenos, ciudad→ciudades, luz→luces
+    if (w.endsWith('z')) {
+      _diccionario.add(w.slice(0, -1) + 'ces');
+    } else if (/[aeiouáéíóú]$/.test(w)) {
+      _diccionario.add(w + 's');
+    } else if (w.length > 3) {
+      _diccionario.add(w + 'es');
+    }
+
+    // Conjugaciones pasadas de verbos regulares
+    if (w.endsWith('ar')) {
+      const r = w.slice(0, -2);
+      _diccionario.add(r + 'ó');      // manifestó
+      _diccionario.add(r + 'aron');   // manifestaron
+      _diccionario.add(r + 'aba');    // manifestaba
+      _diccionario.add(r + 'aban');   // manifestaban
+      _diccionario.add(r + 'ando');   // manifestando
+    } else if (w.endsWith('er') || w.endsWith('ir')) {
+      const r = w.slice(0, -2);
+      _diccionario.add(r + 'ió');     // compareció
+      _diccionario.add(r + 'ieron');  // comparecieron
+      _diccionario.add(r + 'ía');     // comparecía
+      _diccionario.add(r + 'ían');    // comparecían
+      _diccionario.add(r + 'iendo');  // compareciendo
+    }
+
     if (i % 8000 === 0) await new Promise(r => setTimeout(r, 0));
   }
 }
