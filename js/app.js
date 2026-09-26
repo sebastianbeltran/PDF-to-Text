@@ -683,7 +683,7 @@ let _corrCache   = new Map();
 
 async function cargarDiccionario() {
   if (_diccionario) return;
-  const resp = await fetch('https://cdn.jsdelivr.net/npm/dictionary-es@3.2.3/index.dic');
+  const resp = await fetch('https://cdn.jsdelivr.net/npm/dictionary-es@4.0.0/index.dic');
   const texto = await resp.text();
   const lineas = texto.split('\n');
   _diccionario = new Set();
