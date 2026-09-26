@@ -688,6 +688,18 @@ async function cargarDiccionario() {
   const lineas = texto.split('\n');
   _diccionario = new Set();
 
+  // Suplemento de palabras comunes ausentes en el diccionario base
+  const suplemento = [
+    'colombia','colombiana','colombiano','colombianos','colombianas',
+    'bogotá','bogotano','cundinamarca','impedimento','impedimentos',
+    'compareciente','comparecientes','escritura','escrituras',
+    'notaría','notarías','lindero','linderos','linderos',
+    'cédula','cédulas','circuito','circuitos','autorizado','autorizados',
+    'ordenador','ordenadores','debidamente','otorgada','otorgadas',
+    'suscribir','suscrito','suscritos','suscrita','suscritas',
+  ];
+  for (const w of suplemento) _diccionario.add(w);
+
   for (let i = 1; i < lineas.length; i++) {
     const w = lineas[i].split('/')[0].toLowerCase().trim();
     if (w.length < 2) continue;
@@ -703,6 +715,7 @@ async function cargarDiccionario() {
     }
 
     // Conjugaciones pasadas de verbos regulares
+    // Formas verbales y participios
     if (w.endsWith('ar')) {
       const r = w.slice(0, -2);
       _diccionario.add(r + 'ó');      // manifestó
@@ -710,6 +723,12 @@ async function cargarDiccionario() {
       _diccionario.add(r + 'aba');    // manifestaba
       _diccionario.add(r + 'aban');   // manifestaban
       _diccionario.add(r + 'ando');   // manifestando
+      _diccionario.add(r + 'ado');    // identificado
+      _diccionario.add(r + 'ada');    // identificada
+      _diccionario.add(r + 'ados');   // identificados
+      _diccionario.add(r + 'adas');   // identificadas
+      _diccionario.add(r + 'a');      // conceda
+      _diccionario.add(r + 'an');     // concedan
     } else if (w.endsWith('er') || w.endsWith('ir')) {
       const r = w.slice(0, -2);
       _diccionario.add(r + 'ió');     // compareció
@@ -717,6 +736,16 @@ async function cargarDiccionario() {
       _diccionario.add(r + 'ía');     // comparecía
       _diccionario.add(r + 'ían');    // comparecían
       _diccionario.add(r + 'iendo');  // compareciendo
+      _diccionario.add(r + 'ido');    // contenido
+      _diccionario.add(r + 'ida');    // contenida
+      _diccionario.add(r + 'idos');   // contenidos
+      _diccionario.add(r + 'e');      // concede
+      _diccionario.add(r + 'en');     // conceden
+    }
+    // Forma femenina de adjetivos terminados en -o
+    if (w.endsWith('o') && w.length > 4) {
+      _diccionario.add(w.slice(0, -1) + 'a');   // universitario→universitaria
+      _diccionario.add(w.slice(0, -1) + 'as');  // universitarias
     }
 
     if (i % 8000 === 0) await new Promise(r => setTimeout(r, 0));
@@ -724,7 +753,8 @@ async function cargarDiccionario() {
 }
 
 function _correccionD1(lower) {
-  for (let i = 0; i < lower.length; i++) {
+  // Derecha a izquierda: los errores OCR suelen estar en caracteres internos/finales
+  for (let i = lower.length - 1; i >= 0; i--) {
     for (const c of LETRAS_ES) {
       if (c === lower[i]) continue;
       const cand = lower.slice(0, i) + c + lower.slice(i + 1);
@@ -764,12 +794,15 @@ function _corregirPalabra(palabra) {
 
 async function corregirTextoAsync(texto) {
   if (!_diccionario) return texto;
-  // Procesar en lotes de 200 palabras cediendo al navegador entre lotes
-  const tokens = texto.split(/(\b[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]{4,18}\b)/);
+  // Mínimo 6 letras; saltar palabras en MAYÚSCULAS (nombres propios)
+  const tokens = texto.split(/(\b[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]{6,18}\b)/);
   for (let i = 0; i < tokens.length; i++) {
     if (i % 400 === 0 && i > 0) await new Promise(r => setTimeout(r, 0));
-    if (/^[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]{4,18}$/.test(tokens[i])) {
-      tokens[i] = _corregirPalabra(tokens[i]);
+    const tok = tokens[i];
+    if (/^[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]{6,18}$/.test(tok)) {
+      // Saltar si está todo en mayúsculas (nombre propio o sigla)
+      if (tok === tok.toUpperCase()) continue;
+      tokens[i] = _corregirPalabra(tok);
     }
   }
   return tokens.join('');
