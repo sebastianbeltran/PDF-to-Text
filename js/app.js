@@ -658,34 +658,28 @@ async function descargarDocx() {
   btnDescargarDocx.innerHTML = '<span class="spinner"></span> Generando…';
 
   try {
-    const { Document, Packer, Paragraph, TextRun, PageBreak } = docx;
+    if (typeof docx === 'undefined') throw new Error('La biblioteca docx no se cargó. Verifica tu conexión.');
+    const { Document, Packer, Paragraph, TextRun } = docx;
 
     const children = [];
 
-    // Una sección por página del PDF, con salto de página entre ellas
     const paginasListas_ = paginas.filter(p => p.estado === 'lista').sort((a,b) => a.indice - b.indice);
 
     paginasListas_.forEach((pag, i) => {
-      // Separador opcional como título
+      const conSalto = i > 0;
+
       if (separadores) {
         children.push(new Paragraph({
+          pageBreakBefore: conSalto,
           children: [new TextRun({ text: `— Página ${pag.indice} —`, bold: true })]
         }));
+      } else if (conSalto) {
+        children.push(new Paragraph({ pageBreakBefore: true, children: [new TextRun('')] }));
       }
 
-      // Cada línea no vacía → párrafo
       const lineas = pag.texto.split('\n');
       for (const linea of lineas) {
-        children.push(new Paragraph({
-          children: [new TextRun(linea)]
-        }));
-      }
-
-      // Salto de página entre páginas del PDF (no al final)
-      if (i < paginasListas_.length - 1) {
-        children.push(new Paragraph({
-          children: [new PageBreak()]
-        }));
+        children.push(new Paragraph({ children: [new TextRun(linea)] }));
       }
     });
 
