@@ -579,8 +579,6 @@ async function finalizarProceso() {
   }
   workerPool = [];
 
-  // Cargar diccionario en segundo plano para que esté listo al descargar
-  cargarCorrector();
 }
 
 // ─── Reintentar todas las páginas con error ──────────────────
@@ -757,8 +755,6 @@ async function descargarDocx() {
       .filter(p => p.estado === 'lista')
       .sort((a, b) => a.indice - b.indice);
 
-    btnDescargarDocx.innerHTML = '<span class="spinner"></span> Cargando corrector…';
-    const corrector = await cargarCorrector();
     btnDescargarDocx.innerHTML = '<span class="spinner"></span> Generando…';
 
     const font  = '<w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/>';
@@ -772,10 +768,9 @@ async function descargarDocx() {
       if (separadores) {
         cuerpo += `<w:p>${pProp}<w:r><w:rPr>${font}<w:b/></w:rPr><w:t>— Página ${pag.indice} —</w:t></w:r></w:p>`;
       }
-      // Limpiar basura OCR, corregir ortografía y unir líneas en párrafos
-      const textoLimpio   = limpiarLineasOCR(pag.texto);
-      const textoCorregido = corregirPalabras(textoLimpio, corrector);
-      const parrafos = textoCorregido.split(/\n{2,}/);
+      // Limpiar basura OCR y unir líneas en párrafos
+      const textoLimpio = limpiarLineasOCR(pag.texto);
+      const parrafos = textoLimpio.split(/\n{2,}/);
       for (const parrafo of parrafos) {
         const texto = parrafo.replace(/\n/g, ' ').replace(/\s{2,}/g, ' ').trim();
         if (texto) {
