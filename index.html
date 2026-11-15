@@ -15,6 +15,9 @@
 
   <!-- JSZip 3.10.1 — generación de archivos .docx desde cero -->
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+  <!-- pdf-lib 1.17.1 — lectura y escritura de PDFs -->
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 </head>
 <body>
 <div class="contenedor">
@@ -28,98 +31,341 @@
     </div>
   </header>
 
-  <!-- Zona de carga -->
-  <div class="tarjeta">
-    <div id="zona-arrastrar" role="button" tabindex="0" aria-label="Arrastrar PDF o hacer clic para seleccionar">
-      <span class="icono" aria-hidden="true">📂</span>
-      <p>Arrastra tu PDF aquí o haz clic para seleccionarlo</p>
-      <button class="btn btn-primario" id="btn-seleccionar" type="button">
-        Seleccionar archivo PDF
-      </button>
-    </div>
-    <input type="file" id="input-archivo" accept=".pdf,application/pdf" aria-label="Seleccionar archivo PDF" />
+  <!-- Navegación por pestañas -->
+  <nav class="tabs" role="tablist" aria-label="Herramientas PDF">
+    <button class="tab activa" data-panel="panel-extraer" role="tab" id="tab-extraer"
+            aria-controls="panel-extraer" aria-selected="true">📝 Extraer texto</button>
+    <button class="tab" data-panel="panel-dividir" role="tab" id="tab-dividir"
+            aria-controls="panel-dividir" aria-selected="false">✂️ Dividir</button>
+    <button class="tab" data-panel="panel-unir" role="tab" id="tab-unir"
+            aria-controls="panel-unir" aria-selected="false">🔗 Unir</button>
+    <button class="tab" data-panel="panel-rotar" role="tab" id="tab-rotar"
+            aria-controls="panel-rotar" aria-selected="false">🔄 Rotar</button>
+    <button class="tab" data-panel="panel-img-pdf" role="tab" id="tab-img-pdf"
+            aria-controls="panel-img-pdf" aria-selected="false">🖼️ Img→PDF</button>
+    <button class="tab" data-panel="panel-pdf-img" role="tab" id="tab-pdf-img"
+            aria-controls="panel-pdf-img" aria-selected="false">📸 PDF→Img</button>
+    <button class="tab" data-panel="panel-editar" role="tab" id="tab-editar"
+            aria-controls="panel-editar" aria-selected="false">🗂️ Reordenar/Eliminar</button>
+  </nav>
 
-    <!-- Zona de error -->
-    <div id="zona-error" role="alert" aria-live="assertive"></div>
+  <!-- ══════════════════════════════════════════
+       Panel: Extraer texto
+  ══════════════════════════════════════════ -->
+  <div id="panel-extraer" class="panel-tab" role="tabpanel" aria-labelledby="tab-extraer">
 
-    <!-- Opciones -->
-    <div class="fila-opciones" style="margin-top:1.2rem; gap:1.2rem;">
-      <div>
-        <label for="selector-idioma">Idioma OCR:</label><br/>
-        <select id="selector-idioma" aria-label="Idioma para reconocimiento de texto">
-          <option value="spa+eng" selected>Español + Inglés</option>
-          <option value="spa">Solo Español</option>
-          <option value="eng">Solo Inglés</option>
-        </select>
+    <!-- Zona de carga -->
+    <div class="tarjeta">
+      <div id="zona-arrastrar" role="button" tabindex="0" aria-label="Arrastrar PDF o hacer clic para seleccionar">
+        <span class="icono" aria-hidden="true">📂</span>
+        <p>Arrastra tu PDF aquí o haz clic para seleccionarlo</p>
+        <button class="btn btn-primario" id="btn-seleccionar" type="button">
+          Seleccionar archivo PDF
+        </button>
+      </div>
+      <input type="file" id="input-archivo" accept=".pdf,application/pdf" aria-label="Seleccionar archivo PDF" />
+
+      <!-- Zona de error -->
+      <div id="zona-error" role="alert" aria-live="assertive"></div>
+
+      <!-- Opciones -->
+      <div class="fila-opciones" style="margin-top:1.2rem; gap:1.2rem;">
+        <div>
+          <label for="selector-idioma">Idioma OCR:</label><br/>
+          <select id="selector-idioma" aria-label="Idioma para reconocimiento de texto">
+            <option value="spa+eng" selected>Español + Inglés</option>
+            <option value="spa">Solo Español</option>
+            <option value="eng">Solo Inglés</option>
+          </select>
+        </div>
+
+        <label class="checkbox-label">
+          <input type="checkbox" id="chk-forzar-ocr" />
+          Leer todas las páginas con OCR
+        </label>
+
+        <label class="checkbox-label">
+          <input type="checkbox" id="chk-separadores" checked />
+          Insertar separadores entre páginas
+        </label>
       </div>
 
-      <label class="checkbox-label">
-        <input type="checkbox" id="chk-forzar-ocr" />
-        Leer todas las páginas con OCR
-      </label>
-
-      <label class="checkbox-label">
-        <input type="checkbox" id="chk-separadores" checked />
-        Insertar separadores entre páginas
-      </label>
-    </div>
-
-    <!-- Aviso primera descarga de idioma -->
-    <div id="aviso-descarga" aria-live="polite">
-      ℹ️ La primera vez se descargan los datos de idioma (~15 MB). Puede tardar un momento según tu conexión.
-    </div>
-  </div>
-
-  <!-- Sección de progreso -->
-  <div class="tarjeta" id="seccion-progreso" aria-live="polite">
-    <div class="info-progreso">
-      <span id="txt-progreso">Preparando…</span>
-      <span id="txt-tiempo"></span>
-    </div>
-    <div class="barra-fondo" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" id="barra-aria">
-      <div class="barra-relleno" id="barra-relleno"></div>
-    </div>
-    <div class="fila-estado">
-      <span id="txt-pagina-actual"></span>
-      <span id="txt-workers"></span>
-      <div style="margin-left:auto; display:flex; gap:0.5rem;">
-        <button class="btn btn-peligro btn-sm" id="btn-detener" type="button">⏹ Detener</button>
-        <button class="btn btn-primario btn-sm" id="btn-continuar" type="button" style="display:none">▶ Continuar</button>
+      <!-- Aviso primera descarga de idioma -->
+      <div id="aviso-descarga" aria-live="polite">
+        ℹ️ La primera vez se descargan los datos de idioma (~15 MB). Puede tardar un momento según tu conexión.
       </div>
     </div>
 
-    <!-- Preview de la página en proceso -->
-    <div id="contenedor-preview">
-      <p>Procesando vista previa…</p>
-      <canvas id="canvas-preview" aria-label="Vista previa de la página en proceso"></canvas>
-    </div>
-  </div>
+    <!-- Sección de progreso -->
+    <div class="tarjeta" id="seccion-progreso" aria-live="polite">
+      <div class="info-progreso">
+        <span id="txt-progreso">Preparando…</span>
+        <span id="txt-tiempo"></span>
+      </div>
+      <div class="barra-fondo" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" id="barra-aria">
+        <div class="barra-relleno" id="barra-relleno"></div>
+      </div>
+      <div class="fila-estado">
+        <span id="txt-pagina-actual"></span>
+        <span id="txt-workers"></span>
+        <div style="margin-left:auto; display:flex; gap:0.5rem;">
+          <button class="btn btn-peligro btn-sm" id="btn-detener" type="button">⏹ Detener</button>
+          <button class="btn btn-primario btn-sm" id="btn-continuar" type="button" style="display:none">▶ Continuar</button>
+        </div>
+      </div>
 
-  <!-- Lista de páginas -->
-  <div class="tarjeta" id="seccion-paginas">
-    <p class="titulo-seccion">Estado por página</p>
-    <div id="lista-paginas" role="list" aria-label="Estado de cada página del PDF"></div>
-  </div>
-
-  <!-- Resultado -->
-  <div class="tarjeta" id="seccion-resultado">
-    <div class="fila-acciones">
-      <button class="btn btn-secundario" id="btn-copiar" type="button">📋 Copiar</button>
-      <button class="btn btn-secundario" id="btn-descargar-txt" type="button">⬇ Descargar .txt</button>
-      <button class="btn btn-secundario" id="btn-descargar-docx" type="button">⬇ Descargar .docx</button>
-      <button class="btn btn-secundario btn-sm" id="btn-nuevo" type="button">🔄 Nuevo PDF</button>
-      <span class="contador" id="txt-contador" aria-live="polite"></span>
+      <!-- Preview de la página en proceso -->
+      <div id="contenedor-preview">
+        <p>Procesando vista previa…</p>
+        <canvas id="canvas-preview" aria-label="Vista previa de la página en proceso"></canvas>
+      </div>
     </div>
-    <textarea
-      id="texto-resultado"
-      spellcheck="false"
-      aria-label="Texto extraído del PDF, editable"
-      placeholder="El texto aparecerá aquí a medida que se procesen las páginas…"
-    ></textarea>
-  </div>
+
+    <!-- Lista de páginas -->
+    <div class="tarjeta" id="seccion-paginas">
+      <p class="titulo-seccion">Estado por página</p>
+      <div id="lista-paginas" role="list" aria-label="Estado de cada página del PDF"></div>
+    </div>
+
+    <!-- Resultado -->
+    <div class="tarjeta" id="seccion-resultado">
+      <div class="fila-acciones">
+        <button class="btn btn-secundario" id="btn-copiar" type="button">📋 Copiar</button>
+        <button class="btn btn-secundario" id="btn-descargar-txt" type="button">⬇ Descargar .txt</button>
+        <button class="btn btn-secundario" id="btn-descargar-docx" type="button">⬇ Descargar .docx</button>
+        <button class="btn btn-secundario btn-sm" id="btn-nuevo" type="button">🔄 Nuevo PDF</button>
+        <span class="contador" id="txt-contador" aria-live="polite"></span>
+      </div>
+      <textarea
+        id="texto-resultado"
+        spellcheck="false"
+        aria-label="Texto extraído del PDF, editable"
+        placeholder="El texto aparecerá aquí a medida que se procesen las páginas…"
+      ></textarea>
+    </div>
+
+  </div><!-- /panel-extraer -->
+
+  <!-- ══════════════════════════════════════════
+       Panel: Dividir PDF
+  ══════════════════════════════════════════ -->
+  <div id="panel-dividir" class="panel-tab" role="tabpanel" aria-labelledby="tab-dividir" hidden>
+
+    <div class="tarjeta">
+      <div id="zona-dividir" class="zona-drop" role="button" tabindex="0"
+           aria-label="Arrastrar PDF o hacer clic para seleccionar">
+        <span class="icono" aria-hidden="true">✂️</span>
+        <p>Arrastra un PDF aquí o haz clic para seleccionarlo</p>
+        <button class="btn btn-primario" id="btn-sel-dividir" type="button">Seleccionar PDF</button>
+      </div>
+      <input type="file" id="input-dividir" accept=".pdf,application/pdf"
+             aria-label="Seleccionar PDF para dividir" />
+
+      <div id="info-paginas-dividir" class="info-archivo" style="display:none"></div>
+
+      <div id="rangos-container" style="display:none; margin-top:1.2rem;">
+        <label style="font-weight:600; display:block; margin-bottom:0.3rem;">Rangos de páginas</label>
+        <p class="texto-ayuda">Cada rango genera un PDF separado. Con varios rangos se descarga un ZIP.</p>
+        <div id="lista-rangos" class="lista-rangos"></div>
+        <button class="btn btn-secundario btn-sm" id="btn-agregar-rango" type="button" style="margin-top:0.6rem;">
+          + Agregar rango
+        </button>
+      </div>
+
+      <div class="fila-accion-herramienta">
+        <button class="btn btn-primario" id="btn-dividir" type="button" disabled>
+          ✂️ Dividir y descargar
+        </button>
+        <span id="status-dividir" class="status-herramienta" style="display:none" aria-live="polite"></span>
+      </div>
+    </div>
+
+  </div><!-- /panel-dividir -->
+
+  <!-- ══════════════════════════════════════════
+       Panel: Unir PDFs
+  ══════════════════════════════════════════ -->
+  <div id="panel-unir" class="panel-tab" role="tabpanel" aria-labelledby="tab-unir" hidden>
+
+    <div class="tarjeta">
+      <div id="zona-unir" class="zona-drop" role="button" tabindex="0"
+           aria-label="Arrastrar PDFs o hacer clic para seleccionarlos">
+        <span class="icono" aria-hidden="true">🔗</span>
+        <p>Arrastra los PDFs aquí o haz clic para seleccionarlos</p>
+        <button class="btn btn-primario" id="btn-sel-unir" type="button">Agregar PDFs</button>
+      </div>
+      <input type="file" id="input-unir" accept=".pdf,application/pdf" multiple
+             aria-label="Seleccionar PDFs para unir" />
+
+      <div id="lista-unir" class="lista-archivos" style="display:none; margin-top:1rem;"
+           aria-label="Archivos a unir"></div>
+
+      <div class="fila-accion-herramienta">
+        <button class="btn btn-primario" id="btn-unir" type="button" disabled>
+          🔗 Unir y descargar
+        </button>
+        <span id="status-unir" class="status-herramienta" style="display:none" aria-live="polite"></span>
+      </div>
+    </div>
+
+  </div><!-- /panel-unir -->
+
+  <!-- ══════════════════════════════════════════
+       Panel: Rotar páginas
+  ══════════════════════════════════════════ -->
+  <div id="panel-rotar" class="panel-tab" role="tabpanel" aria-labelledby="tab-rotar" hidden>
+    <div class="tarjeta">
+      <div id="zona-rotar" class="zona-drop" role="button" tabindex="0"
+           aria-label="Arrastrar PDF o hacer clic para seleccionar">
+        <span class="icono" aria-hidden="true">🔄</span>
+        <p>Arrastra un PDF aquí o haz clic para seleccionarlo</p>
+        <button class="btn btn-primario" id="btn-sel-rotar" type="button">Seleccionar PDF</button>
+      </div>
+      <input type="file" id="input-rotar" accept=".pdf,application/pdf"
+             aria-label="Seleccionar PDF para rotar" />
+
+      <div id="info-rotar" class="info-archivo" style="display:none"></div>
+
+      <div id="controles-rotar" style="display:none; margin-top:1rem;">
+        <div class="fila-accion-herramienta" style="margin-top:0; margin-bottom:0.8rem;">
+          <span style="font-size:0.88rem; color:var(--texto-secundario);">Rotar todas:</span>
+          <button class="btn btn-secundario btn-sm" id="btn-rotar-todo-izq" type="button">↺ 90° izq</button>
+          <button class="btn btn-secundario btn-sm" id="btn-rotar-todo-der" type="button">↻ 90° der</button>
+          <button class="btn btn-secundario btn-sm" id="btn-rotar-todo-180" type="button">↕ 180°</button>
+        </div>
+        <div class="lista-rotar" id="lista-rotar"></div>
+      </div>
+
+      <div class="fila-accion-herramienta">
+        <button class="btn btn-primario" id="btn-guardar-rotar" type="button" disabled>
+          💾 Guardar PDF
+        </button>
+        <span id="status-rotar" class="status-herramienta" style="display:none" aria-live="polite"></span>
+      </div>
+    </div>
+  </div><!-- /panel-rotar -->
+
+  <!-- ══════════════════════════════════════════
+       Panel: Imágenes → PDF
+  ══════════════════════════════════════════ -->
+  <div id="panel-img-pdf" class="panel-tab" role="tabpanel" aria-labelledby="tab-img-pdf" hidden>
+    <div class="tarjeta">
+      <div id="zona-img-pdf" class="zona-drop" role="button" tabindex="0"
+           aria-label="Arrastrar imágenes o hacer clic para seleccionarlas">
+        <span class="icono" aria-hidden="true">🖼️</span>
+        <p>Arrastra imágenes aquí o haz clic para seleccionarlas</p>
+        <button class="btn btn-primario" id="btn-sel-img-pdf" type="button">Agregar imágenes</button>
+      </div>
+      <input type="file" id="input-img-pdf" accept="image/*" multiple
+             aria-label="Seleccionar imágenes para convertir a PDF" />
+
+      <div id="lista-img-pdf" class="lista-archivos" style="display:none; margin-top:1rem;"></div>
+
+      <div style="margin-top:1rem;" class="fila-opciones">
+        <div>
+          <label for="sel-tamano-pag">Tamaño de página:</label><br/>
+          <select id="sel-tamano-pag">
+            <option value="auto" selected>Ajustar a imagen</option>
+            <option value="a4">A4 vertical</option>
+            <option value="a4l">A4 horizontal</option>
+            <option value="letter">Carta vertical</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="fila-accion-herramienta">
+        <button class="btn btn-primario" id="btn-crear-pdf" type="button" disabled>
+          📄 Crear PDF
+        </button>
+        <span id="status-img-pdf" class="status-herramienta" style="display:none" aria-live="polite"></span>
+      </div>
+    </div>
+  </div><!-- /panel-img-pdf -->
+
+  <!-- ══════════════════════════════════════════
+       Panel: PDF → Imágenes
+  ══════════════════════════════════════════ -->
+  <div id="panel-pdf-img" class="panel-tab" role="tabpanel" aria-labelledby="tab-pdf-img" hidden>
+    <div class="tarjeta">
+      <div id="zona-pdf-img" class="zona-drop" role="button" tabindex="0"
+           aria-label="Arrastrar PDF o hacer clic para seleccionar">
+        <span class="icono" aria-hidden="true">📸</span>
+        <p>Arrastra un PDF aquí o haz clic para seleccionarlo</p>
+        <button class="btn btn-primario" id="btn-sel-pdf-img" type="button">Seleccionar PDF</button>
+      </div>
+      <input type="file" id="input-pdf-img" accept=".pdf,application/pdf"
+             aria-label="Seleccionar PDF para exportar como imágenes" />
+
+      <div id="info-pdf-img" class="info-archivo" style="display:none"></div>
+
+      <div style="margin-top:1rem;" class="fila-opciones">
+        <div>
+          <label for="sel-escala">Calidad:</label><br/>
+          <select id="sel-escala">
+            <option value="1">Normal (72 dpi)</option>
+            <option value="2" selected>Alta (144 dpi)</option>
+            <option value="3">Máxima (216 dpi)</option>
+          </select>
+        </div>
+        <div>
+          <label for="sel-fmt-img">Formato:</label><br/>
+          <select id="sel-fmt-img">
+            <option value="image/png" selected>PNG</option>
+            <option value="image/jpeg">JPEG</option>
+          </select>
+        </div>
+        <div>
+          <label for="input-rango-img">Páginas (opcional):</label><br/>
+          <input type="text" id="input-rango-img" class="input-texto" style="width:160px;"
+                 placeholder="Ej: 2-8 (vacío = todas)"
+                 autocomplete="off" spellcheck="false" />
+        </div>
+      </div>
+
+      <div class="fila-accion-herramienta">
+        <button class="btn btn-primario" id="btn-exportar-imgs" type="button" disabled>
+          🖼️ Exportar imágenes
+        </button>
+        <span id="status-pdf-img" class="status-herramienta" style="display:none" aria-live="polite"></span>
+      </div>
+    </div>
+  </div><!-- /panel-pdf-img -->
+
+  <!-- ══════════════════════════════════════════
+       Panel: Editar páginas
+  ══════════════════════════════════════════ -->
+  <div id="panel-editar" class="panel-tab" role="tabpanel" aria-labelledby="tab-editar" hidden>
+    <div class="tarjeta">
+      <div id="zona-editar" class="zona-drop" role="button" tabindex="0"
+           aria-label="Arrastrar PDF o hacer clic para seleccionar">
+        <span class="icono" aria-hidden="true">🗂️</span>
+        <p>Arrastra un PDF aquí o haz clic para seleccionarlo</p>
+        <button class="btn btn-primario" id="btn-sel-editar" type="button">Seleccionar PDF</button>
+      </div>
+      <input type="file" id="input-editar" accept=".pdf,application/pdf"
+             aria-label="Seleccionar PDF para editar páginas" />
+
+      <div id="info-editar" class="info-archivo" style="display:none"></div>
+
+      <p class="texto-ayuda" id="ayuda-editar" style="display:none; margin-top:0.8rem;">
+        Arrastra las miniaturas para reordenar páginas. Haz clic en ✕ para eliminar una página.
+        Los cambios se aplican al guardar.
+      </p>
+      <div id="grid-editar" class="grid-thumbs" style="display:none; margin-top:1rem;"></div>
+
+      <div class="fila-accion-herramienta">
+        <button class="btn btn-primario" id="btn-guardar-editar" type="button" disabled>
+          💾 Guardar PDF
+        </button>
+        <span id="status-editar" class="status-herramienta" style="display:none" aria-live="polite"></span>
+      </div>
+    </div>
+  </div><!-- /panel-editar -->
 
 </div><!-- /contenedor -->
 
 <script src="js/app.js"></script>
+<script src="js/pdf-tools.js"></script>
+<script src="js/pdf-herramientas.js"></script>
 </body>
 </html>

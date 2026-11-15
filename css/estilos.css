@@ -379,3 +379,358 @@ select:focus-visible { outline: 3px solid var(--primario); }
 #lista-paginas::-webkit-scrollbar { width: 5px; }
 #lista-paginas::-webkit-scrollbar-track { background: transparent; }
 #lista-paginas::-webkit-scrollbar-thumb { background: var(--borde); border-radius: 99px; }
+
+/* ===== Tabs ===== */
+.tabs {
+  display: flex;
+  margin-bottom: 1.2rem;
+  border-bottom: 2px solid var(--borde);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+
+.tab {
+  background: none;
+  border: none;
+  border-bottom: 2.5px solid transparent;
+  margin-bottom: -2px;
+  padding: 0.65rem 1.3rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--texto-secundario);
+  cursor: pointer;
+  border-radius: var(--radio-sm) var(--radio-sm) 0 0;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+
+.tab:hover {
+  color: var(--texto);
+  background: color-mix(in srgb, var(--texto) 5%, transparent);
+}
+
+.tab.activa {
+  color: var(--primario);
+  border-bottom-color: var(--primario);
+}
+
+.tab:focus-visible {
+  outline: 3px solid var(--primario);
+  outline-offset: -3px;
+}
+
+/* ===== Zonas de drop reutilizables ===== */
+.zona-drop {
+  border: 2.5px dashed var(--borde);
+  border-radius: var(--radio);
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.zona-drop:hover,
+.zona-drop.encima {
+  border-color: var(--primario);
+  background: color-mix(in srgb, var(--primario) 5%, transparent);
+}
+
+.zona-drop .icono {
+  font-size: 2.5rem;
+  margin-bottom: 0.6rem;
+  display: block;
+}
+
+.zona-drop p {
+  color: var(--texto-secundario);
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+}
+
+/* ===== Herramientas PDF ===== */
+.info-archivo {
+  margin-top: 0.8rem;
+  padding: 0.5rem 0.8rem;
+  background: color-mix(in srgb, var(--primario) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primario) 25%, transparent);
+  border-radius: var(--radio-sm);
+  font-size: 0.88rem;
+  color: var(--primario);
+}
+
+.texto-ayuda {
+  font-size: 0.82rem;
+  color: var(--texto-secundario);
+  margin-bottom: 0.5rem;
+}
+
+.input-texto {
+  width: 100%;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-sm);
+  background: var(--superficie);
+  color: var(--texto);
+  font-size: 0.95rem;
+  font-family: 'Courier New', Courier, monospace;
+}
+.input-texto:focus-visible { outline: 3px solid var(--primario); }
+
+.fila-accion-herramienta {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  margin-top: 1.2rem;
+}
+
+.status-herramienta {
+  font-size: 0.88rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: var(--radio-sm);
+}
+.status-info  { background: color-mix(in srgb, var(--primario) 10%, transparent); color: var(--primario); }
+.status-ok    { background: color-mix(in srgb, var(--exito) 10%, transparent); color: var(--exito); }
+.status-error { background: color-mix(in srgb, var(--peligro) 10%, transparent); color: var(--peligro); }
+
+/* ===== Lista de archivos (Unir) ===== */
+.lista-archivos {
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-sm);
+  overflow: hidden;
+}
+
+.archivo-unir {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.8rem;
+  border-bottom: 1px solid var(--borde);
+  font-size: 0.88rem;
+}
+.archivo-unir:last-child { border-bottom: none; }
+
+.archivo-unir-num {
+  min-width: 1.5rem;
+  text-align: center;
+  font-weight: 600;
+  color: var(--texto-secundario);
+  flex-shrink: 0;
+}
+
+.archivo-unir-nombre {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archivo-unir-acciones {
+  display: flex;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+
+/* ===== Filas de rango (Dividir) ===== */
+.lista-rangos {
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-sm);
+  overflow: hidden;
+}
+
+.fila-rango {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.8rem;
+  border-bottom: 1px solid var(--borde);
+  font-size: 0.88rem;
+}
+.fila-rango:last-child { border-bottom: none; }
+
+.rango-label {
+  min-width: 3.8rem;
+  font-weight: 600;
+  color: var(--texto-secundario);
+  font-size: 0.82rem;
+}
+
+.rango-sep {
+  color: var(--texto-secundario);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.input-num {
+  width: 4.5rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-sm);
+  background: var(--superficie);
+  color: var(--texto);
+  font-size: 0.9rem;
+  text-align: center;
+}
+.input-num:focus-visible { outline: 3px solid var(--primario); }
+
+.btn-quitar-rango { margin-left: auto; flex-shrink: 0; }
+
+/* ===== Lista rotación ===== */
+.lista-rotar {
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-sm);
+  overflow: hidden;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.pagina-rotar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.8rem;
+  border-bottom: 1px solid var(--borde);
+  font-size: 0.88rem;
+}
+.pagina-rotar:last-child { border-bottom: none; }
+
+.pagina-rotar-num {
+  min-width: 2.8rem;
+  font-weight: 600;
+  color: var(--texto-secundario);
+}
+
+.pagina-rotar-angulo {
+  min-width: 2.8rem;
+  font-family: 'Courier New', monospace;
+  color: var(--primario);
+  font-size: 0.82rem;
+}
+
+.pagina-rotar-btns {
+  margin-left: auto;
+  display: flex;
+  gap: 0.3rem;
+}
+
+/* ===== Lista imágenes (Img → PDF) ===== */
+.archivo-img {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.8rem;
+  border-bottom: 1px solid var(--borde);
+  font-size: 0.88rem;
+}
+.archivo-img:last-child { border-bottom: none; }
+
+.archivo-img-preview {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+  border: 1px solid var(--borde);
+}
+
+.archivo-img-nombre {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archivo-img-acciones {
+  display: flex;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+
+/* ===== Grid de miniaturas (Editar páginas) ===== */
+.grid-thumbs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 0.6rem;
+  max-height: 520px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-sm);
+}
+
+.thumb-item {
+  position: relative;
+  border: 2px solid var(--borde);
+  border-radius: var(--radio-sm);
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+  transition: border-color 0.15s, transform 0.1s, opacity 0.15s;
+  background: var(--fondo);
+}
+
+.thumb-item:hover { border-color: var(--primario); }
+
+.thumb-item.arrastrando {
+  opacity: 0.35;
+  cursor: grabbing;
+}
+
+.thumb-item.drop-encima {
+  border-color: var(--primario);
+  border-style: dashed;
+  transform: scale(0.96);
+}
+
+.thumb-item canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  min-height: 70px;
+  background: var(--fondo);
+}
+
+.thumb-num {
+  display: block;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.25rem 0;
+  color: var(--texto-secundario);
+  background: var(--superficie);
+}
+
+.thumb-delete {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  background: var(--peligro);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 0.65rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+  padding: 0;
+  line-height: 1;
+}
+.thumb-item:hover .thumb-delete { opacity: 1; }
+
+.grid-thumbs::-webkit-scrollbar { width: 5px; }
+.grid-thumbs::-webkit-scrollbar-track { background: transparent; }
+.grid-thumbs::-webkit-scrollbar-thumb { background: var(--borde); border-radius: 99px; }
+
+@media (max-width: 600px) {
+  .tab { padding: 0.55rem 0.8rem; font-size: 0.85rem; }
+  .zona-drop { padding: 2rem 1rem; }
+  .grid-thumbs { grid-template-columns: repeat(auto-fill, minmax(85px, 1fr)); }
+  .pagina-rotar-btns { gap: 0.2rem; }
+}
