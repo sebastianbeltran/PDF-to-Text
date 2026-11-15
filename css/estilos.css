@@ -383,42 +383,42 @@ select:focus-visible { outline: 3px solid var(--primario); }
 /* ===== Tabs ===== */
 .tabs {
   display: flex;
-  margin-bottom: 1.2rem;
-  border-bottom: 2px solid var(--borde);
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 1.5rem;
+  padding: 0.35rem;
+  background: color-mix(in srgb, var(--texto) 6%, transparent);
+  border-radius: calc(var(--radio) + 2px);
 }
-.tabs::-webkit-scrollbar { display: none; }
 
 .tab {
-  background: none;
+  background: transparent;
   border: none;
-  border-bottom: 2.5px solid transparent;
-  margin-bottom: -2px;
-  padding: 0.65rem 1.3rem;
-  font-size: 0.95rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.88rem;
   font-weight: 500;
   color: var(--texto-secundario);
   cursor: pointer;
-  border-radius: var(--radio-sm) var(--radio-sm) 0 0;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  border-radius: var(--radio-sm);
+  transition: color 0.15s, background 0.15s, box-shadow 0.15s;
   white-space: nowrap;
 }
 
 .tab:hover {
   color: var(--texto);
-  background: color-mix(in srgb, var(--texto) 5%, transparent);
+  background: color-mix(in srgb, var(--texto) 8%, transparent);
 }
 
 .tab.activa {
+  background: var(--superficie);
   color: var(--primario);
-  border-bottom-color: var(--primario);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
 }
 
 .tab:focus-visible {
   outline: 3px solid var(--primario);
-  outline-offset: -3px;
+  outline-offset: 1px;
 }
 
 /* ===== Zonas de drop reutilizables ===== */
