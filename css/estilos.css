@@ -386,9 +386,6 @@ select:focus-visible { outline: 3px solid var(--primario); }
   flex-wrap: wrap;
   gap: 0.3rem;
   margin-bottom: 1.5rem;
-  padding: 0.35rem;
-  background: color-mix(in srgb, var(--texto) 6%, transparent);
-  border-radius: calc(var(--radio) + 2px);
 }
 
 .tab {
